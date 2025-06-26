@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth0 } from '@auth0/auth0-react'
+import { useUser } from '@auth0/nextjs-auth0/client'
 import { Plus, Settings, Wrench, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -14,7 +14,7 @@ import { SettingsModal } from './settings-modal'
 
 export function ChatSidebar() {
   const router = useRouter()
-  const { logout } = useAuth0()
+  const { user } = useUser()
   const { conversations, addConversation, deleteConversation } = useChatStore()
   const [isToolsOpen, setIsToolsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -28,7 +28,7 @@ export function ChatSidebar() {
       timestamp: now,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
-      userId: 'current-user'
+      userId: user?.sub || 'current-user'
     }
     
     addConversation(newConversation)
@@ -36,68 +36,72 @@ export function ChatSidebar() {
   }
 
   const handleLogout = () => {
-    logout({ logoutParams: { returnTo: window.location.origin } })
+    window.location.href = '/api/auth/logout'
   }
 
   return (
-    <div className="w-80 bg-card border-r border-border flex flex-col">
+    <div className="w-64 bg-muted/50 border-r border-border flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-border">
         <Button 
           onClick={handleNewChat}
-          className="w-full justify-start gap-2"
-          variant="outline"
+          className="w-full justify-start"
+          size="sm"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="w-4 h-4 mr-2" />
           New Chat
         </Button>
       </div>
 
-      {/* Conversation List */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Conversations */}
+      <div className="flex-1 overflow-hidden">
         <ConversationList 
-          conversations={conversations} 
-          onNewConversation={handleNewChat}
+          conversations={conversations}
           onDeleteConversation={deleteConversation}
         />
       </div>
 
       {/* Footer */}
       <div className="p-4 border-t border-border space-y-2">
-        <Sheet open={isToolsOpen} onOpenChange={setIsToolsOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <Wrench className="h-4 w-4" />
-              My Tools
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80">
-            <ToolsDrawer />
-          </SheetContent>
-        </Sheet>
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            onClick={() => setIsSettingsOpen(true)}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          onClick={() => setIsToolsOpen(true)}
+          variant="ghost"
+          className="w-full justify-start"
+          size="sm"
+        >
+          <Wrench className="w-4 h-4 mr-2" />
+          Tools
+        </Button>
+        
+        <Button
+          onClick={() => setIsSettingsOpen(true)}
+          variant="ghost"
+          className="w-full justify-start"
+          size="sm"
+        >
+          <Settings className="w-4 h-4 mr-2" />
+          Settings
+        </Button>
+        
+        <Button
+          onClick={handleLogout}
+          variant="ghost"
+          className="w-full justify-start"
+          size="sm"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
 
+      {/* Modals */}
+      <ToolsDrawer 
+        open={isToolsOpen} 
+        onOpenChange={setIsToolsOpen}
+      />
       <SettingsModal 
         open={isSettingsOpen} 
-        onOpenChange={setIsSettingsOpen} 
+        onOpenChange={setIsSettingsOpen}
       />
     </div>
   )

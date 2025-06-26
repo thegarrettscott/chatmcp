@@ -1,6 +1,6 @@
 "use client"
 
-import { Auth0Provider } from '@auth0/auth0-react'
+import { UserProvider } from '@auth0/nextjs-auth0/client'
 import { ReactNode } from 'react'
 
 interface Auth0ProviderWrapperProps {
@@ -9,16 +9,8 @@ interface Auth0ProviderWrapperProps {
 
 export function Auth0ProviderWrapper({ children }: Auth0ProviderWrapperProps) {
   return (
-    <Auth0Provider
-      domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN!}
-      clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!}
-      authorizationParams={{
-        redirect_uri: typeof window !== 'undefined' ? window.location.origin : '',
-        audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE,
-        scope: 'openid profile email genai-agent'
-      }}
-    >
+    <UserProvider>
       {children}
-    </Auth0Provider>
+    </UserProvider>
   )
 } 

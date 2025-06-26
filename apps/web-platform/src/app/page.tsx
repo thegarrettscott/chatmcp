@@ -2,17 +2,17 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth0 } from '@auth0/auth0-react'
+import { useUser } from '@auth0/nextjs-auth0/client'
 import { useChatStore } from '@/stores/chat-store'
 
 export default function HomePage() {
   const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuth0()
+  const { user, isLoading } = useUser()
   const { conversations, currentConversation } = useChatStore()
 
   useEffect(() => {
     if (!isLoading) {
-      if (!isAuthenticated) {
+      if (!user) {
         return
       }
 
@@ -24,7 +24,7 @@ export default function HomePage() {
         router.push('/chat/new')
       }
     }
-  }, [isAuthenticated, isLoading, conversations, currentConversation, router])
+  }, [user, isLoading, conversations, currentConversation, router])
 
   if (isLoading) {
     return (
@@ -34,7 +34,7 @@ export default function HomePage() {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -42,12 +42,12 @@ export default function HomePage() {
           <p className="text-muted-foreground mb-8">
             Your AI platform with MCP tool integration
           </p>
-          <button
-            onClick={() => window.location.href = '/api/auth/login'}
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
+          <a
+            href="/api/auth/login"
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors inline-block"
           >
             Sign In
-          </button>
+          </a>
         </div>
       </div>
     )

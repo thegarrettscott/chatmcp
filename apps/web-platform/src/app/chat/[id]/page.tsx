@@ -2,14 +2,14 @@
 
 import { useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { useAuth0 } from '@auth0/auth0-react'
+import { useUser } from '@auth0/nextjs-auth0/client'
 import { ChatSidebar } from '@/components/chat-sidebar'
 import { ChatMain } from '@/components/chat-main'
 import { useChatStore } from '@/stores/chat-store'
 
 export default function ChatPage() {
   const params = useParams()
-  const { isAuthenticated, isLoading } = useAuth0()
+  const { user, isLoading } = useUser()
   const { setCurrentConversation, conversations } = useChatStore()
   const conversationId = params.id as string
 
@@ -32,7 +32,7 @@ export default function ChatPage() {
     )
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -40,12 +40,12 @@ export default function ChatPage() {
           <p className="text-muted-foreground mb-8">
             You need to be authenticated to access the chat
           </p>
-          <button
-            onClick={() => window.location.href = '/api/auth/login'}
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
+          <a
+            href="/api/auth/login"
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors inline-block"
           >
             Sign In
-          </button>
+          </a>
         </div>
       </div>
     )
