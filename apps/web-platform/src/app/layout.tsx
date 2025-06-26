@@ -1,14 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import dynamic from 'next/dynamic'
+import { ClientProviders } from '@/components/client-providers'
 import { ThemeProvider } from '@/components/theme-provider'
-
-// Dynamically import Auth0Provider with no SSR
-const Auth0ProviderWrapper = dynamic(
-  () => import('@/components/auth0-provider-wrapper').then(mod => ({ default: mod.Auth0ProviderWrapper })),
-  { ssr: false }
-)
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -25,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Auth0ProviderWrapper>
+        <ClientProviders>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -34,7 +28,7 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
-        </Auth0ProviderWrapper>
+        </ClientProviders>
       </body>
     </html>
   )
