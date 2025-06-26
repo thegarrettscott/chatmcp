@@ -42,12 +42,12 @@ export default function HomePage() {
           <p className="text-muted-foreground mb-8">
             Your AI platform with MCP tool integration
           </p>
-          <a
-            href="/api/auth/login"
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors inline-block"
+          <button
+            onClick={() => window.location.href = '/api/auth/login'}
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
           >
             Sign In
-          </a>
+          </button>
         </div>
       </div>
     )

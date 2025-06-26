@@ -16,7 +16,7 @@ interface Conversation {
 
 interface ConversationListProps {
   conversations: Conversation[]
-  onNewConversation: () => void
+  onNewConversation?: () => void
   onDeleteConversation: (id: string) => void
 }
 
@@ -30,17 +30,19 @@ export function ConversationList({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <Button 
-          onClick={onNewConversation}
-          className="w-full justify-start gap-2"
-          variant="outline"
-        >
-          <Plus className="w-4 h-4" />
-          New Chat
-        </Button>
-      </div>
+      {/* Header - only show if onNewConversation is provided */}
+      {onNewConversation && (
+        <div className="p-4 border-b">
+          <Button 
+            onClick={onNewConversation}
+            className="w-full justify-start gap-2"
+            variant="outline"
+          >
+            <Plus className="w-4 h-4" />
+            New Chat
+          </Button>
+        </div>
+      )}
 
       {/* Conversations */}
       <ScrollArea className="flex-1">
