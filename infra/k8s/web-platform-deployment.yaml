@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-platform
+  labels:
+    app: web-platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-platform
+  template:
+    metadata:
+      labels:
+        app: web-platform
+      annotations:
+        spiffe.io/spiffe-id: "spiffe://chatmcp.com/web-platform"
+    spec:
+      containers:
+      - name: web-platform
+        image: chatmcp/web-platform:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: AUTH0_DOMAIN
+          valueFrom:
+            secretKeyRef:
+              name: auth0-secrets
+              key: domain
+        - name: AUTH0_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: auth0-secrets
+              key: client-id
+        - name: AUTH0_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth0-secrets
+              key: client-secret
+        - name: ORCHESTRATOR_URL
+          value: "http://orchestrator-service:4000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      - name: spiffe-agent
+        image: ghcr.io/spiffe/spiffe-csi-driver:latest
+        volumeMounts:
+        - name: spiffe-workload-api
+          mountPath: /run/spiffe/workload
+        - name: spiffe-socket
+          mountPath: /run/spiffe/socket
+      volumes:
+      - name: spiffe-workload-api
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true
+      - name: spiffe-socket
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-platform-service
+spec:
+  selector:
+    app: web-platform
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-platform-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - chatmcp.com
+    secretName: web-platform-tls
+  rules:
+  - host: chatmcp.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-platform-service
+            port:
+              number: 80 

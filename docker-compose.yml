@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  web-platform:
+    build:
+      context: .
+      dockerfile: apps/web-platform/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+      - ORCHESTRATOR_URL=http://orchestrator:4000
+    depends_on:
+      - orchestrator
+    volumes:
+      - ./apps/web-platform:/app
+      - /app/node_modules
+    networks:
+      - chatmcp-network
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/chatmcp
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./apps/orchestrator:/app
+      - /app/node_modules
+    networks:
+      - chatmcp-network
+
+  example-tool:
+    build:
+      context: .
+      dockerfile: services/example-tool/Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=development
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+      - PORT=5001
+    volumes:
+      - ./services/example-tool:/app
+      - /app/node_modules
+    networks:
+      - chatmcp-network
+
+  postgres:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=chatmcp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - chatmcp-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chatmcp-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - chatmcp-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  chatmcp-network:
+    driver: bridge 
