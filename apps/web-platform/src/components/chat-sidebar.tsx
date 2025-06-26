@@ -15,7 +15,7 @@ import { SettingsModal } from './settings-modal'
 export function ChatSidebar() {
   const router = useRouter()
   const { logout } = useAuth0()
-  const { conversations, addConversation } = useChatStore()
+  const { conversations, addConversation, deleteConversation } = useChatStore()
   const [isToolsOpen, setIsToolsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -55,7 +55,11 @@ export function ChatSidebar() {
 
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
-        <ConversationList conversations={conversations} />
+        <ConversationList 
+          conversations={conversations} 
+          onNewConversation={handleNewChat}
+          onDeleteConversation={deleteConversation}
+        />
       </div>
 
       {/* Footer */}
