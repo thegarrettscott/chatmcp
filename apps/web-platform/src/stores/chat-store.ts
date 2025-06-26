@@ -16,10 +16,40 @@ interface ChatStore extends ChatState {
   clearError: () => void
 }
 
+const sampleConversations: Conversation[] = [
+  {
+    id: '1',
+    title: 'Getting Started with MCP',
+    lastMessage: 'How do I set up my first MCP tool?',
+    timestamp: new Date('2024-01-15T10:30:00Z'),
+    createdAt: '2024-01-15T10:30:00Z',
+    updatedAt: '2024-01-15T10:30:00Z',
+    userId: 'user1'
+  },
+  {
+    id: '2',
+    title: 'API Integration Help',
+    lastMessage: 'I need help integrating the weather API',
+    timestamp: new Date('2024-01-14T15:45:00Z'),
+    createdAt: '2024-01-14T15:45:00Z',
+    updatedAt: '2024-01-14T15:45:00Z',
+    userId: 'user1'
+  },
+  {
+    id: '3',
+    title: 'Database Schema Design',
+    lastMessage: 'What\'s the best way to structure my user table?',
+    timestamp: new Date('2024-01-13T09:20:00Z'),
+    createdAt: '2024-01-13T09:20:00Z',
+    updatedAt: '2024-01-13T09:20:00Z',
+    userId: 'user1'
+  }
+]
+
 export const useChatStore = create<ChatStore>()(
   persist(
     (set, get) => ({
-      conversations: [],
+      conversations: sampleConversations,
       currentConversation: null,
       messages: [],
       isLoading: false,

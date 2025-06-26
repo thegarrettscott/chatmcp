@@ -54,7 +54,7 @@ export default function ChatPage() {
   return (
     <div className="flex h-screen bg-background">
       <ChatSidebar />
-      <ChatMain />
+      <ChatMain conversationId={conversationId} />
     </div>
   )
 } 

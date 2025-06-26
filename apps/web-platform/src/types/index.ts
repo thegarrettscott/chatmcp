@@ -1,6 +1,8 @@
 export interface Conversation {
   id: string;
   title: string;
+  lastMessage: string;
+  timestamp: Date;
   createdAt: string;
   updatedAt: string;
   userId: string;

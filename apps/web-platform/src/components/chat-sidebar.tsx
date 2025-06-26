@@ -20,11 +20,14 @@ export function ChatSidebar() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const handleNewChat = async () => {
+    const now = new Date();
     const newConversation = {
       id: `conv_${Date.now()}`,
       title: 'New Chat',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      lastMessage: '',
+      timestamp: now,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
       userId: 'current-user'
     }
     
