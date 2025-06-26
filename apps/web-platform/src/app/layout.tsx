@@ -1,8 +1,14 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Auth0Provider } from '@auth0/auth0-react'
+import dynamic from 'next/dynamic'
 import { ThemeProvider } from '@/components/theme-provider'
+
+// Dynamically import Auth0Provider with no SSR
+const Auth0ProviderWrapper = dynamic(
+  () => import('@/components/auth0-provider-wrapper').then(mod => ({ default: mod.Auth0ProviderWrapper })),
+  { ssr: false }
+)
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,15 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Auth0Provider
-          domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN!}
-          clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID!}
-          authorizationParams={{
-            redirect_uri: typeof window !== 'undefined' ? window.location.origin : '',
-            audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE,
-            scope: 'openid profile email genai-agent'
-          }}
-        >
+        <Auth0ProviderWrapper>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -36,7 +34,7 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
-        </Auth0Provider>
+        </Auth0ProviderWrapper>
       </body>
     </html>
   )
