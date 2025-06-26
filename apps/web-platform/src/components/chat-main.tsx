@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useUser } from '@auth0/nextjs-auth0/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User } from 'lucide-react'
+import { Send, Bot, User, Loader2 } from 'lucide-react'
 
 interface Message {
   id: string
@@ -18,6 +19,7 @@ interface ChatMainProps {
 }
 
 export function ChatMain({ conversationId }: ChatMainProps) {
+  const { user } = useUser()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -26,12 +28,15 @@ export function ChatMain({ conversationId }: ChatMainProps) {
   useEffect(() => {
     // Scroll to bottom when messages change
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
     }
   }, [messages])
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || !user) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -41,25 +46,96 @@ export function ChatMain({ conversationId }: ChatMainProps) {
     }
 
     setMessages(prev => [...prev, userMessage])
+    const currentInput = input
     setInput('')
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Call orchestrator API - using fetch with credentials for auth
+      const response = await fetch(`${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000'}/agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          prompt: currentInput,
+          conversationId: conversationId !== 'new' ? conversationId : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.statusText}`)
+      }
+
+      const result = await response.json()
       
+      // Set up Server-Sent Events for streaming
+      const eventSource = new EventSource(
+        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000'}/agent/stream/${result.streamId}`
+      )
+
+      let assistantContent = ''
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `This is a simulated response to: "${input}"`,
+        content: '',
         timestamp: new Date()
       }
 
       setMessages(prev => [...prev, assistantMessage])
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        
+        if (data.type === 'content') {
+          assistantContent += data.content
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantMessage.id 
+                ? { ...msg, content: assistantContent }
+                : msg
+            )
+          )
+        } else if (data.type === 'done') {
+          eventSource.close()
+          setIsLoading(false)
+        } else if (data.type === 'error') {
+          console.error('Streaming error:', data.error)
+          eventSource.close()
+          setIsLoading(false)
+        }
+      }
+
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error)
+        eventSource.close()
+        setIsLoading(false)
+        
+        // Fallback to simulated response
+        const fallbackMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `I apologize, but I'm having trouble connecting to the AI service right now. This is a simulated response to: "${currentInput}"`,
+          timestamp: new Date()
+        }
+        
+        setMessages(prev => [...prev.slice(0, -1), fallbackMessage])
+      }
+
     } catch (error) {
       console.error('Failed to send message:', error)
-    } finally {
       setIsLoading(false)
+      
+      // Fallback to simulated response
+      const fallbackMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `I apologize, but I'm having trouble connecting to the AI service right now. This is a simulated response to: "${currentInput}"`,
+        timestamp: new Date()
+      }
+      
+      setMessages(prev => [...prev, fallbackMessage])
     }
   }
 
@@ -71,51 +147,72 @@ export function ChatMain({ conversationId }: ChatMainProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b border-border p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <h2 className="font-semibold text-lg">
+          {conversationId === 'new' ? 'New Chat' : 'Chat'}
+        </h2>
+      </div>
+
       {/* Messages Area */}
       <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
+        <div className="space-y-6 max-w-4xl mx-auto">
+          {messages.length === 0 && (
+            <div className="text-center py-12">
+              <Bot className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+              <p className="text-muted-foreground">
+                Ask me anything! I&apos;m powered by OpenAI&apos;s o3 model with MCP tool integration.
+              </p>
+            </div>
+          )}
+          
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-3 ${
+              className={`flex gap-4 ${
                 message.role === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
               {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                   <Bot className="w-4 h-4 text-primary-foreground" />
                 </div>
               )}
+              
               <div
-                className={`max-w-[70%] rounded-lg p-3 ${
+                className={`max-w-[80%] lg:max-w-[70%] rounded-2xl px-4 py-3 ${
                   message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-primary text-primary-foreground ml-12'
                     : 'bg-muted'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <p className="mb-0 whitespace-pre-wrap">{message.content}</p>
+                </div>
+                <p className="text-xs opacity-70 mt-2">
                   {message.timestamp.toLocaleTimeString()}
                 </p>
               </div>
+              
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                   <User className="w-4 h-4" />
                 </div>
               )}
             </div>
           ))}
+          
           {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <div className="flex gap-4 justify-start">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4 text-primary-foreground" />
               </div>
-              <div className="bg-muted rounded-lg p-3">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <div className="bg-muted rounded-2xl px-4 py-3">
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Thinking...</span>
                 </div>
               </div>
             </div>
@@ -124,23 +221,29 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t p-4">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+      <div className="flex-shrink-0 border-t border-border p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex gap-3">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              disabled={isLoading}
+              className="flex-1 min-h-[44px] resize-none"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              size="icon"
+              className="h-[44px] w-[44px] flex-shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Powered by OpenAI o3 with MCP tool integration
+          </p>
         </div>
       </div>
     </div>

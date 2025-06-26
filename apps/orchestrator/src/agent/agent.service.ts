@@ -121,11 +121,11 @@ export class AgentService {
               result,
             );
 
-            if (functionResponse.output_text?.delta) {
-              currentContent += functionResponse.output_text.delta;
+            if (functionResponse.output_text?.content) {
+              currentContent += functionResponse.output_text.content;
               res.write(`data: ${JSON.stringify({
                 type: 'content',
-                content: functionResponse.output_text.delta,
+                content: functionResponse.output_text.content,
               })}\n\n`);
             }
           } catch (error) {

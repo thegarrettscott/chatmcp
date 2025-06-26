@@ -2,11 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { setupTracing } from './tracing';
+// import { setupTracing } from './tracing';
 
 async function bootstrap() {
   // Setup OpenTelemetry tracing
-  await setupTracing();
+  // await setupTracing();
 
   const app = await NestFactory.create(AppModule);
 

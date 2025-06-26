@@ -3,6 +3,9 @@ const nextConfig = {
   images: {
     domains: ['lh3.googleusercontent.com', 'graph.facebook.com'],
   },
+  env: {
+    NEXT_PUBLIC_ORCHESTRATOR_URL: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000',
+  },
   async headers() {
     return [
       {
