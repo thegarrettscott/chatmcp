@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health/health.controller';
 import { ConversationModule } from './conversation/conversation.module';
 import { SupabaseModule } from './supabase/supabase.module';
+import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SupabaseModule } from './supabase/supabase.module';
     AgentModule,
     ConversationModule,
     SupabaseModule,
+    ToolsModule,
   ],
   controllers: [HealthController],
 })
