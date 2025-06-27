@@ -252,7 +252,9 @@ export function ChatMain({ conversationId }: ChatMainProps) {
                     }`}
                   >
                     <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <p className="mb-0 whitespace-pre-wrap text-foreground">{message.content}</p>
+                      <p className={`mb-0 whitespace-pre-wrap ${
+                        message.role === 'user' ? 'text-primary-foreground' : 'text-foreground'
+                      }`}>{message.content}</p>
                     </div>
                     {message.reasoning && (
                       <div className="mt-2 p-2 bg-black/10 rounded text-xs">
