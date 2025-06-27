@@ -100,13 +100,20 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       }
       setMessages(prev => [...prev, userMessage])
 
-      // Call orchestrator API
+      // Get Auth0 access token
+      const tokenResponse = await fetch('/api/auth/token')
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to get access token')
+      }
+      const { accessToken } = await tokenResponse.json()
+
+      // Call orchestrator API with JWT token
       const response = await fetch(`${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
-        credentials: 'include',
         body: JSON.stringify({
           prompt: currentInput,
           conversationId: activeConversationId,
@@ -119,9 +126,9 @@ export function ChatMain({ conversationId }: ChatMainProps) {
 
       const result = await response.json()
       
-      // Set up Server-Sent Events for streaming
+      // Set up Server-Sent Events for streaming with auth token
       const eventSource = new EventSource(
-        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent/stream/${result.streamId}`
+        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent/stream/${result.responseId}?token=${encodeURIComponent(accessToken)}`
       )
 
       let assistantContent = ''
