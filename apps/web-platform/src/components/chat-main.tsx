@@ -101,7 +101,7 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       setMessages(prev => [...prev, userMessage])
 
       // Call orchestrator API directly (temporarily without auth)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent`, {
+      const response = await fetch('https://chatmcp.fly.dev/agent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       
       // Set up Server-Sent Events for streaming (temporarily without token)
       const eventSource = new EventSource(
-        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent/stream/${result.responseId}`
+        `https://chatmcp.fly.dev/agent/stream/${result.responseId}`
       )
 
       let assistantContent = ''
