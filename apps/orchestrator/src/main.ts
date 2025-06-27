@@ -12,7 +12,11 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: process.env.NEXT_PUBLIC_APP_URL || 'https://chatmcp.vercel.app',
+    origin: [
+      'https://chatmcp.vercel.app',
+      'https://chatmcp-nu.vercel.app',
+      process.env.NEXT_PUBLIC_APP_URL || 'https://chatmcp.vercel.app'
+    ],
     credentials: true,
   });
 
