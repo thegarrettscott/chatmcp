@@ -15,24 +15,17 @@ import { SettingsModal } from './settings-modal'
 export function ChatSidebar() {
   const router = useRouter()
   const { user } = useUser()
-  const { conversations, addConversation, deleteConversation } = useChatStore()
+  const { conversations, createConversation, deleteConversation } = useChatStore()
   const [isToolsOpen, setIsToolsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const handleNewChat = async () => {
-    const now = new Date();
-    const newConversation = {
-      id: `conv_${Date.now()}`,
-      title: 'New Chat',
-      lastMessage: '',
-      timestamp: now,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      userId: user?.sub || 'current-user'
+    try {
+      const newConversation = await createConversation('New Chat')
+      router.push(`/chat/${newConversation.id}`)
+    } catch (error) {
+      console.error('Failed to create conversation:', error)
     }
-    
-    addConversation(newConversation)
-    router.push(`/chat/${newConversation.id}`)
   }
 
   const handleLogout = () => {

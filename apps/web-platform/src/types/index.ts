@@ -1,25 +1,25 @@
 export interface Conversation {
   id: string;
   title: string;
-  lastMessage: string;
-  timestamp: Date;
-  createdAt: string;
-  updatedAt: string;
-  userId: string;
+  last_message?: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+  user_id: string;
 }
 
 export interface Message {
   id: string;
-  conversationId: string;
+  conversation_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  createdAt: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
   reasoning?: {
     summary: string;
     effort: string;
   };
-  functionCalls?: FunctionCall[];
-  functionOutputs?: FunctionOutput[];
+  function_calls?: FunctionCall[];
+  function_outputs?: FunctionOutput[];
 }
 
 export interface FunctionCall {
@@ -31,7 +31,7 @@ export interface FunctionCall {
 
 export interface FunctionOutput {
   id: string;
-  functionCallId: string;
+  function_call_id: string;
   output: any;
   error?: string;
 }

@@ -1,15 +1,15 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { ClientProviders } from '@/components/client-providers'
+import { UserProvider } from '@auth0/nextjs-auth0/client'
 import { ThemeProvider } from '@/components/theme-provider'
-import { Toaster } from '@/components/ui/toaster'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'ChatMCP - AI Platform with MCP Tools',
-  description: 'ChatGPT-style platform with Auth0-GenAI-secured MCP agent integration',
+  title: 'ChatMCP - AI-Powered Chat Platform',
+  description: 'Advanced chat platform with MCP tool integration and OpenAI o3 model',
 }
 
 export default function RootLayout({
@@ -20,17 +20,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ClientProviders>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-            <Toaster />
-          </ThemeProvider>
-        </ClientProviders>
+        <ErrorBoundary>
+          <UserProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </UserProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

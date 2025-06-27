@@ -12,7 +12,7 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    origin: process.env.NEXT_PUBLIC_APP_URL || 'https://chatmcp.vercel.app',
     credentials: true,
   });
 
@@ -36,8 +36,8 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port);
   
-  console.log(`🚀 Orchestrator is running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api`);
+  console.log(`🚀 Orchestrator is running on: https://chatmcp.fly.dev`);
+  console.log(`📚 API Documentation: https://chatmcp.fly.dev/api`);
 }
 
 bootstrap(); 

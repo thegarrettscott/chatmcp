@@ -6,13 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Plus, MessageSquare, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-
-interface Conversation {
-  id: string
-  title: string
-  lastMessage: string
-  timestamp: Date
-}
+import { ensureDate } from '@/stores/chat-store'
+import { Conversation } from '@/types'
 
 interface ConversationListProps {
   conversations: Conversation[]
@@ -27,6 +22,16 @@ export function ConversationList({
 }: ConversationListProps) {
   const params = useParams()
   const currentId = params.id as string
+
+  const formatTimestamp = (timestamp: Date | string | null | undefined): string => {
+    try {
+      const date = ensureDate(timestamp);
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return 'Invalid date';
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -65,12 +70,12 @@ export function ConversationList({
                       {conversation.title}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {conversation.lastMessage}
+                      {conversation.last_message || 'No messages yet'}
                     </p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {conversation.timestamp.toLocaleDateString()}
+                  {formatTimestamp(conversation.updated_at)}
                 </p>
               </Link>
               

@@ -2,17 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useUser } from '@auth0/nextjs-auth0/client'
+import { useRouter } from 'next/navigation'
+import { useChatStore } from '@/stores/chat-store'
+import { Message } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, Bot, User, Loader2 } from 'lucide-react'
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
+import { ensureDate } from '@/stores/chat-store'
 
 interface ChatMainProps {
   conversationId: string
@@ -20,10 +17,39 @@ interface ChatMainProps {
 
 export function ChatMain({ conversationId }: ChatMainProps) {
   const { user } = useUser()
+  const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  const {
+    currentConversation,
+    createConversation,
+    setCurrentConversation,
+    fetchMessages,
+  } = useChatStore()
+
+  // Fetch messages when conversation changes
+  useEffect(() => {
+    if (conversationId && conversationId !== 'new') {
+      setIsLoadingMessages(true)
+      fetchMessages(conversationId)
+        .then((fetchedMessages) => {
+          setMessages(fetchedMessages || [])
+        })
+        .catch((error) => {
+          console.error('Failed to fetch messages:', error)
+          setMessages([])
+        })
+        .finally(() => {
+          setIsLoadingMessages(false)
+        })
+    } else {
+      setMessages([])
+    }
+  }, [conversationId, fetchMessages])
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -35,24 +61,47 @@ export function ChatMain({ conversationId }: ChatMainProps) {
     }
   }, [messages])
 
+  const formatTimestamp = (timestamp: Date | string | null | undefined): string => {
+    try {
+      const date = ensureDate(timestamp);
+      return date.toLocaleTimeString();
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return 'Invalid time';
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading || !user) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date()
-    }
-
-    setMessages(prev => [...prev, userMessage])
     const currentInput = input
     setInput('')
     setIsLoading(true)
 
     try {
-      // Call orchestrator API - using fetch with credentials for auth
-      const response = await fetch(`${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000'}/agent`, {
+      let activeConversationId = conversationId
+
+      // If we're in a new chat, create a conversation first
+      if (conversationId === 'new') {
+        const newConversation = await createConversation(currentInput.slice(0, 50) + '...')
+        activeConversationId = newConversation.id
+        setCurrentConversation(newConversation)
+        // Update the URL to the new conversation
+        router.replace(`/chat/${newConversation.id}`)
+      }
+
+      // Add user message to local state immediately
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        conversation_id: activeConversationId,
+        role: 'user',
+        content: currentInput,
+        created_at: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, userMessage])
+
+      // Call orchestrator API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,7 +109,7 @@ export function ChatMain({ conversationId }: ChatMainProps) {
         credentials: 'include',
         body: JSON.stringify({
           prompt: currentInput,
-          conversationId: conversationId !== 'new' ? conversationId : undefined,
+          conversationId: activeConversationId,
         }),
       })
 
@@ -72,15 +121,16 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       
       // Set up Server-Sent Events for streaming
       const eventSource = new EventSource(
-        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000'}/agent/stream/${result.streamId}`
+        `${process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'https://chatmcp.fly.dev'}/agent/stream/${result.streamId}`
       )
 
       let assistantContent = ''
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
+        conversation_id: activeConversationId,
         role: 'assistant',
         content: '',
-        timestamp: new Date()
+        created_at: new Date().toISOString()
       }
 
       setMessages(prev => [...prev, assistantMessage])
@@ -115,9 +165,10 @@ export function ChatMain({ conversationId }: ChatMainProps) {
         // Fallback to simulated response
         const fallbackMessage: Message = {
           id: (Date.now() + 1).toString(),
+          conversation_id: activeConversationId,
           role: 'assistant',
           content: `I apologize, but I'm having trouble connecting to the AI service right now. This is a simulated response to: "${currentInput}"`,
-          timestamp: new Date()
+          created_at: new Date().toISOString()
         }
         
         setMessages(prev => [...prev.slice(0, -1), fallbackMessage])
@@ -130,9 +181,10 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       // Fallback to simulated response
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
+        conversation_id: conversationId,
         role: 'assistant',
         content: `I apologize, but I'm having trouble connecting to the AI service right now. This is a simulated response to: "${currentInput}"`,
-        timestamp: new Date()
+        created_at: new Date().toISOString()
       }
       
       setMessages(prev => [...prev, fallbackMessage])
@@ -151,14 +203,19 @@ export function ChatMain({ conversationId }: ChatMainProps) {
       {/* Header */}
       <div className="flex-shrink-0 border-b border-border p-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <h2 className="font-semibold text-lg">
-          {conversationId === 'new' ? 'New Chat' : 'Chat'}
+          {conversationId === 'new' ? 'New Chat' : currentConversation?.title || 'Chat'}
         </h2>
       </div>
 
       {/* Messages Area */}
       <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
         <div className="space-y-6 max-w-4xl mx-auto">
-          {messages.length === 0 && (
+          {isLoadingMessages ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-muted-foreground" />
+              <p className="text-muted-foreground">Loading messages...</p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="text-center py-12">
               <Bot className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
@@ -166,43 +223,49 @@ export function ChatMain({ conversationId }: ChatMainProps) {
                 Ask me anything! I&apos;m powered by OpenAI&apos;s o3 model with MCP tool integration.
               </p>
             </div>
-          )}
-          
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-4 ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-primary-foreground" />
-                </div>
-              )}
-              
+          ) : (
+            messages.map((message) => (
               <div
-                className={`max-w-[80%] lg:max-w-[70%] rounded-2xl px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground ml-12'
-                    : 'bg-muted'
+                key={message.id}
+                className={`flex gap-4 ${
+                  message.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <p className="mb-0 whitespace-pre-wrap">{message.content}</p>
+                {message.role === 'assistant' && (
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                )}
+                
+                <div
+                  className={`max-w-[80%] lg:max-w-[70%] rounded-2xl px-4 py-3 ${
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground ml-12'
+                      : 'bg-muted'
+                  }`}
+                >
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <p className="mb-0 whitespace-pre-wrap">{message.content}</p>
+                  </div>
+                  {message.reasoning && (
+                    <div className="mt-2 p-2 bg-black/10 rounded text-xs">
+                      <p><strong>Reasoning:</strong> {message.reasoning.summary}</p>
+                      <p><strong>Effort:</strong> {message.reasoning.effort}</p>
+                    </div>
+                  )}
+                  <p className="text-xs opacity-70 mt-2">
+                    {formatTimestamp(message.created_at)}
+                  </p>
                 </div>
-                <p className="text-xs opacity-70 mt-2">
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
+                
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                )}
               </div>
-              
-              {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4" />
-                </div>
-              )}
-            </div>
-          ))}
+            ))
+          )}
           
           {isLoading && (
             <div className="flex gap-4 justify-start">

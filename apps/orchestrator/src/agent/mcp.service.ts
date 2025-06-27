@@ -18,7 +18,7 @@ export class McpService {
   
   // Registry of available MCP tools
   private readonly toolRegistry = new Map<string, string>([
-    ['weather', process.env.EXAMPLE_TOOL_URL || 'http://localhost:5001'],
+    ['weather', process.env.EXAMPLE_TOOL_URL || 'https://api.example-tool.com'],
     // Add more tools here as they become available
   ]);
 

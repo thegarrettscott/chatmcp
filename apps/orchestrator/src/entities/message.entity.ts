@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -10,48 +10,32 @@ import { Conversation } from './conversation.entity';
 
 @Entity('messages')
 export class Message {
-  @PrimaryColumn('uuid')
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ name: 'conversation_id', type: 'uuid' })
   conversationId: string;
 
-  @Column({
-    type: 'varchar',
-    length: 50,
-    enum: ['user', 'assistant', 'system'],
-  })
+  @Column({ type: 'varchar', length: 50 })
   role: 'user' | 'assistant' | 'system';
 
   @Column({ type: 'text' })
   content: string;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @Column({
-    type: 'jsonb',
-    nullable: true,
-    comment: 'Reasoning data from o3 model',
-  })
+  @Column({ type: 'jsonb', nullable: true })
   reasoning?: {
-    summary?: string;
-    effort?: string;
+    summary: string;
+    effort: string;
   };
 
-  @Column({
-    type: 'jsonb',
-    nullable: true,
-    comment: 'Function call data',
-  })
+  @Column({ name: 'function_calls', type: 'jsonb', nullable: true })
   functionCalls?: any[];
 
-  @Column({
-    type: 'jsonb',
-    nullable: true,
-    comment: 'Function output data',
-  })
+  @Column({ name: 'function_outputs', type: 'jsonb', nullable: true })
   functionOutputs?: any[];
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp with time zone' })
+  createdAt: Date;
 
   @ManyToOne(() => Conversation, (conversation) => conversation.messages, {
     onDelete: 'CASCADE',
