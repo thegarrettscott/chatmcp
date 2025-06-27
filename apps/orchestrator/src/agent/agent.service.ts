@@ -10,6 +10,7 @@ import { Response } from 'express';
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
+  private readonly promptStore = new Map<string, string>(); // Temporary in-memory storage
 
   constructor(
     @Inject('SUPABASE_CLIENT')
@@ -26,8 +27,13 @@ export class AgentService {
       // Generate a unique response ID
       const responseId = uuidv4();
       
-      // Store the user's prompt in Redis for streaming
-      await this.redisService.setUserPrompt(responseId, createAgentRequest.prompt);
+      // Store the user's prompt (try Redis first, fallback to memory)
+      try {
+        await this.redisService.setUserPrompt(responseId, createAgentRequest.prompt);
+      } catch (error) {
+        this.logger.warn('Redis unavailable, storing prompt in memory');
+        this.promptStore.set(responseId, createAgentRequest.prompt);
+      }
       
       // Create initial conversation record (simplified)
       const conversation = {
@@ -56,12 +62,26 @@ export class AgentService {
     try {
       this.logger.log(`Starting stream for response: ${responseId}`);
       
-      // Get the user's original prompt
-      const userPrompt = await this.redisService.getUserPrompt(responseId);
+      // Get the user's original prompt (try Redis first, fallback to memory)
+      let userPrompt: string;
+      try {
+        userPrompt = await this.redisService.getUserPrompt(responseId);
+      } catch (error) {
+        this.logger.warn('Redis unavailable, getting prompt from memory');
+        userPrompt = this.promptStore.get(responseId) || 'Hello! How can I help you today?';
+      }
+      
       this.logger.log(`Retrieved user prompt: ${userPrompt}`);
+      
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
       
       // Get the best available model (o3)
       const model = await this.openaiService.getBestAvailableModel();
+      this.logger.log(`Using model: ${model} for user prompt: ${userPrompt}`);
 
       // Create OpenAI response with o3 using the actual user prompt
       const response = await this.openaiService.createResponse({
@@ -72,23 +92,41 @@ export class AgentService {
         stream: true,
       });
 
+      this.logger.log('OpenAI response created, starting stream...');
+
       if (response.stream) {
         // Stream the response
+        let contentReceived = false;
         for await (const chunk of response.stream) {
           if (chunk.choices && chunk.choices[0]?.delta?.content) {
+            contentReceived = true;
+            const content = chunk.choices[0].delta.content;
+            this.logger.log(`Streaming content chunk: ${content.substring(0, 50)}...`);
+            
             const data = {
               type: 'content',
-              content: chunk.choices[0].delta.content,
+              content: content,
               timestamp: new Date().toISOString(),
             };
             
             res.write(`data: ${JSON.stringify(data)}\n\n`);
           }
         }
+        
+        if (!contentReceived) {
+          this.logger.warn('No content received from OpenAI stream');
+        }
+      } else {
+        this.logger.warn('No stream available from OpenAI response');
       }
 
       // Send completion signal
+      this.logger.log('Stream completed, sending done signal');
       res.write(`data: ${JSON.stringify({ type: 'done', timestamp: new Date().toISOString() })}\n\n`);
+      
+      // Clean up memory storage
+      this.promptStore.delete(responseId);
+      
       res.end();
 
     } catch (error) {
