@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Power, PowerOff, ExternalLink } from 'lucide-react';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserTool {
   id: string;
@@ -24,6 +24,7 @@ export default function ToolsPage() {
   const [tools, setTools] = useState<UserTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -38,16 +39,23 @@ export default function ToolsPage() {
     const error = urlParams.get('error');
 
     if (slackStatus === 'connected') {
-      toast.success('Slack workspace connected successfully!');
+      toast({
+        title: "Success",
+        description: "Slack workspace connected successfully!",
+      });
       fetchTools(); // Refresh tools list
       // Clean up URL
       window.history.replaceState({}, '', '/tools');
     } else if (error) {
-      toast.error('Failed to connect Slack workspace');
+      toast({
+        title: "Error",
+        description: "Failed to connect Slack workspace",
+        variant: "destructive",
+      });
       // Clean up URL
       window.history.replaceState({}, '', '/tools');
     }
-  }, []);
+  }, [toast]);
 
   const fetchTools = async () => {
     try {
@@ -61,11 +69,19 @@ export default function ToolsPage() {
         const data = await response.json();
         setTools(data);
       } else {
-        toast.error('Failed to fetch tools');
+        toast({
+          title: "Error",
+          description: "Failed to fetch tools",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error fetching tools:', error);
-      toast.error('Failed to fetch tools');
+      toast({
+        title: "Error",
+        description: "Failed to fetch tools",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -91,11 +107,19 @@ export default function ToolsPage() {
         // Redirect to Slack OAuth
         window.location.href = data.authUrl;
       } else {
-        toast.error('Failed to initiate Slack connection');
+        toast({
+          title: "Error",
+          description: "Failed to initiate Slack connection",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error connecting to Slack:', error);
-      toast.error('Failed to connect to Slack');
+      toast({
+        title: "Error",
+        description: "Failed to connect to Slack",
+        variant: "destructive",
+      });
     } finally {
       setConnecting(false);
     }
@@ -116,13 +140,24 @@ export default function ToolsPage() {
       if (response.ok) {
         const updatedTool = await response.json();
         setTools(tools.map(t => t.id === tool.id ? updatedTool : t));
-        toast.success(`${tool.toolName} ${updatedTool.enabled ? 'enabled' : 'disabled'}`);
+        toast({
+          title: "Success",
+          description: `${tool.toolName} ${updatedTool.enabled ? 'enabled' : 'disabled'}`,
+        });
       } else {
-        toast.error('Failed to toggle tool');
+        toast({
+          title: "Error",
+          description: "Failed to toggle tool",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error toggling tool:', error);
-      toast.error('Failed to toggle tool');
+      toast({
+        title: "Error",
+        description: "Failed to toggle tool",
+        variant: "destructive",
+      });
     }
   };
 
@@ -144,13 +179,24 @@ export default function ToolsPage() {
 
       if (response.ok) {
         setTools(tools.filter(t => t.id !== tool.id));
-        toast.success(`${tool.toolName} removed`);
+        toast({
+          title: "Success",
+          description: `${tool.toolName} removed`,
+        });
       } else {
-        toast.error('Failed to remove tool');
+        toast({
+          title: "Error",
+          description: "Failed to remove tool",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error removing tool:', error);
-      toast.error('Failed to remove tool');
+      toast({
+        title: "Error",
+        description: "Failed to remove tool",
+        variant: "destructive",
+      });
     }
   };
 
