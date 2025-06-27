@@ -223,47 +223,55 @@ export function ChatMain({ conversationId }: ChatMainProps) {
               </p>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-4 ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                {message.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-primary-foreground" />
-                  </div>
-                )}
-                
+            messages
+              .filter(message => {
+                // Hide empty assistant messages when loading (thinking state)
+                if (isLoading && message.role === 'assistant' && !message.content.trim()) {
+                  return false;
+                }
+                return true;
+              })
+              .map((message) => (
                 <div
-                  className={`max-w-[80%] lg:max-w-[70%] rounded-2xl px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground ml-12'
-                      : 'bg-muted'
+                  key={message.id}
+                  className={`flex gap-4 ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <p className="mb-0 whitespace-pre-wrap">{message.content}</p>
-                  </div>
-                  {message.reasoning && (
-                    <div className="mt-2 p-2 bg-black/10 rounded text-xs">
-                      <p><strong>Reasoning:</strong> {message.reasoning.summary}</p>
-                      <p><strong>Effort:</strong> {message.reasoning.effort}</p>
+                  {message.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-primary-foreground" />
                     </div>
                   )}
-                  <p className="text-xs opacity-70 mt-2">
-                    {formatTimestamp(message.created_at)}
-                  </p>
-                </div>
-                
-                {message.role === 'user' && (
-                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4" />
+                  
+                  <div
+                    className={`max-w-[80%] lg:max-w-[70%] rounded-2xl px-4 py-3 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground ml-12'
+                        : 'bg-muted text-foreground'
+                    }`}
+                  >
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <p className="mb-0 whitespace-pre-wrap text-foreground">{message.content}</p>
+                    </div>
+                    {message.reasoning && (
+                      <div className="mt-2 p-2 bg-black/10 rounded text-xs">
+                        <p><strong>Reasoning:</strong> {message.reasoning.summary}</p>
+                        <p><strong>Effort:</strong> {message.reasoning.effort}</p>
+                      </div>
+                    )}
+                    <p className="text-xs opacity-70 mt-2">
+                      {formatTimestamp(message.created_at)}
+                    </p>
                   </div>
-                )}
-              </div>
-            ))
+                  
+                  {message.role === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+              ))
           )}
           
           {isLoading && (
