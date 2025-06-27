@@ -98,9 +98,25 @@ export class AgentService {
         // Stream the response
         let contentReceived = false;
         for await (const chunk of response.stream) {
-          if (chunk.choices && chunk.choices[0]?.delta?.content) {
+          this.logger.log(`Raw chunk received:`, JSON.stringify(chunk, null, 2));
+          
+          let content = null;
+          
+          // Handle o3 responses format
+          if (chunk.output_text?.delta) {
+            content = chunk.output_text.delta;
+          }
+          // Handle regular chat completions format  
+          else if (chunk.choices && chunk.choices[0]?.delta?.content) {
+            content = chunk.choices[0].delta.content;
+          }
+          // Handle other possible formats
+          else if (chunk.delta?.content) {
+            content = chunk.delta.content;
+          }
+          
+          if (content) {
             contentReceived = true;
-            const content = chunk.choices[0].delta.content;
             this.logger.log(`Streaming content chunk: ${content.substring(0, 50)}...`);
             
             const data = {
@@ -111,10 +127,24 @@ export class AgentService {
             
             res.write(`data: ${JSON.stringify(data)}\n\n`);
           }
+          
+          // Handle completion for o3 format
+          if (chunk.done) {
+            this.logger.log('o3 stream marked as done');
+            break;
+          }
         }
         
         if (!contentReceived) {
           this.logger.warn('No content received from OpenAI stream');
+          // Send a fallback message so user sees something
+          const fallbackContent = `I received your message: "${userPrompt}" but encountered an issue with the streaming response. This might be due to OpenAI API limitations with the o3 model.`;
+          const data = {
+            type: 'content',
+            content: fallbackContent,
+            timestamp: new Date().toISOString(),
+          };
+          res.write(`data: ${JSON.stringify(data)}\n\n`);
         }
       } else {
         this.logger.warn('No stream available from OpenAI response');
