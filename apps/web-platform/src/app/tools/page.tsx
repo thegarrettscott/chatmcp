@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,38 +26,13 @@ export default function ToolsPage() {
   const [connecting, setConnecting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (user) {
-      fetchTools();
-    }
-  }, [user]);
+  const getAccessToken = useCallback(async () => {
+    const response = await fetch('/api/auth/token');
+    const data = await response.json();
+    return data.accessToken;
+  }, []);
 
-  useEffect(() => {
-    // Check for connection status in URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    const slackStatus = urlParams.get('slack');
-    const error = urlParams.get('error');
-
-    if (slackStatus === 'connected') {
-      toast({
-        title: "Success",
-        description: "Slack workspace connected successfully!",
-      });
-      fetchTools(); // Refresh tools list
-      // Clean up URL
-      window.history.replaceState({}, '', '/tools');
-    } else if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to connect Slack workspace",
-        variant: "destructive",
-      });
-      // Clean up URL
-      window.history.replaceState({}, '', '/tools');
-    }
-  }, [toast]);
-
-  const fetchTools = async () => {
+  const fetchTools = useCallback(async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tools`, {
         headers: {
@@ -85,13 +60,38 @@ export default function ToolsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAccessToken, toast]);
 
-  const getAccessToken = async () => {
-    const response = await fetch('/api/auth/token');
-    const data = await response.json();
-    return data.accessToken;
-  };
+  useEffect(() => {
+    if (user) {
+      fetchTools();
+    }
+  }, [user, fetchTools]);
+
+  useEffect(() => {
+    // Check for connection status in URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const slackStatus = urlParams.get('slack');
+    const error = urlParams.get('error');
+
+    if (slackStatus === 'connected') {
+      toast({
+        title: "Success",
+        description: "Slack workspace connected successfully!",
+      });
+      fetchTools(); // Refresh tools list
+      // Clean up URL
+      window.history.replaceState({}, '', '/tools');
+    } else if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to connect Slack workspace",
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', '/tools');
+    }
+  }, [toast, fetchTools]);
 
   const connectSlack = async () => {
     setConnecting(true);
