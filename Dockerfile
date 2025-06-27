@@ -20,18 +20,22 @@ FROM base as build
 RUN apt-get update -qq && \
     apt-get install -y python-is-python3 pkg-config build-essential 
 
+# Install pnpm
+RUN npm install -g pnpm
+
 # Install node modules
-COPY --link package.json .
-RUN npm install --production=false
+COPY --link package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --link apps/orchestrator/package.json ./apps/orchestrator/
+RUN pnpm install --production=false
 
 # Copy application code
 COPY --link . .
 
 # Build application
-RUN npm run build
+RUN pnpm run build
 
 # Remove development dependencies
-RUN npm prune --production
+RUN pnpm prune --production
 
 
 # Final stage for app image
@@ -41,4 +45,4 @@ FROM base
 COPY --from=build /app /app
 
 # Start the server by default, this can be overwritten at runtime
-CMD [ "npm", "run", "start" ]
+CMD [ "pnpm", "run", "start" ]

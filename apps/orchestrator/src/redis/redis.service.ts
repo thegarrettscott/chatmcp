@@ -180,6 +180,37 @@ export class RedisService {
     }
   }
 
+  async setUserPrompt(responseId: string, prompt: string): Promise<void> {
+    if (!this.redisEnabled || !this.redis) {
+      this.logger.warn('Redis not available, skipping setUserPrompt');
+      return;
+    }
+
+    try {
+      const key = `prompt:${responseId}`;
+      await this.redis.set(key, prompt, 'EX', 3600); // Expire in 1 hour
+      this.logger.log(`Stored prompt for response: ${responseId}`);
+    } catch (error) {
+      this.logger.error('Failed to set user prompt:', error);
+    }
+  }
+
+  async getUserPrompt(responseId: string): Promise<string | null> {
+    if (!this.redisEnabled || !this.redis) {
+      this.logger.warn('Redis not available, returning fallback prompt');
+      return 'Hello! How can I help you today?'; // Fallback prompt
+    }
+
+    try {
+      const key = `prompt:${responseId}`;
+      const prompt = await this.redis.get(key);
+      return prompt || 'Hello! How can I help you today?'; // Fallback if not found
+    } catch (error) {
+      this.logger.error('Failed to get user prompt:', error);
+      return 'Hello! How can I help you today?'; // Fallback on error
+    }
+  }
+
   async onModuleDestroy() {
     if (this.redis) {
       await this.redis.disconnect();

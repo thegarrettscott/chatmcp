@@ -1,8 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Conversation } from '../entities/conversation.entity';
-import { Message } from '../entities/message.entity';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CreateConversationDto {
   title: string;
@@ -17,9 +14,16 @@ export interface CreateMessageDto {
     summary: string;
     effort: string;
   };
+  functionCalls?: any[];
+  functionOutputs?: any[];
 }
 
-export interface ConversationWithLastMessage extends Conversation {
+export interface ConversationWithLastMessage {
+  id: string;
+  title: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
   lastMessage: string;
   timestamp: Date;
 }
@@ -27,142 +31,196 @@ export interface ConversationWithLastMessage extends Conversation {
 @Injectable()
 export class ConversationService {
   constructor(
-    @InjectRepository(Conversation)
-    private conversationRepository: Repository<Conversation>,
-    @InjectRepository(Message)
-    private messageRepository: Repository<Message>,
+    @Inject('SUPABASE_CLIENT')
+    private supabase: SupabaseClient,
   ) {}
 
   async findAll(userId?: string): Promise<ConversationWithLastMessage[]> {
-    const queryBuilder = this.conversationRepository
-      .createQueryBuilder('conversation')
-      .leftJoinAndSelect('conversation.messages', 'message')
-      .orderBy('conversation.updatedAt', 'DESC');
+    let query = this.supabase
+      .from('conversations')
+      .select(`
+        *,
+        messages(content, created_at)
+      `)
+      .order('updated_at', { ascending: false });
 
     if (userId) {
-      queryBuilder.where('conversation.userId = :userId', { userId });
+      query = query.eq('user_id', userId);
     }
 
-    const conversations = await queryBuilder.getMany();
+    const { data: conversations, error } = await query;
 
-    // Add lastMessage to each conversation
-    return conversations.map(conversation => {
-      const lastMessage = conversation.messages?.length > 0 
-        ? conversation.messages[conversation.messages.length - 1]
-        : null;
+    if (error) {
+      throw new Error(`Failed to fetch conversations: ${error.message}`);
+    }
 
-      return {
-        ...conversation,
-        lastMessage: lastMessage?.content || '',
-        timestamp: conversation.updatedAt,
-      } as ConversationWithLastMessage;
-    });
+    return conversations?.map(conversation => ({
+      id: conversation.id,
+      title: conversation.title,
+      userId: conversation.user_id,
+      createdAt: new Date(conversation.created_at),
+      updatedAt: new Date(conversation.updated_at),
+      lastMessage: conversation.messages?.length > 0 
+        ? conversation.messages[conversation.messages.length - 1].content 
+        : '',
+      timestamp: new Date(conversation.updated_at),
+    })) || [];
   }
 
   async findOne(id: string, userId?: string): Promise<ConversationWithLastMessage> {
-    const queryBuilder = this.conversationRepository
-      .createQueryBuilder('conversation')
-      .leftJoinAndSelect('conversation.messages', 'message')
-      .where('conversation.id = :id', { id });
+    let query = this.supabase
+      .from('conversations')
+      .select(`
+        *,
+        messages(content, created_at)
+      `)
+      .eq('id', id);
 
     if (userId) {
-      queryBuilder.andWhere('conversation.userId = :userId', { userId });
+      query = query.eq('user_id', userId);
     }
 
-    const conversation = await queryBuilder.getOne();
+    const { data: conversations, error } = await query.single();
 
-    if (!conversation) {
+    if (error || !conversations) {
       throw new NotFoundException('Conversation not found');
     }
 
     return {
-      ...conversation,
-      lastMessage: conversation.messages?.length > 0 
-        ? conversation.messages[conversation.messages.length - 1].content
+      id: conversations.id,
+      title: conversations.title,
+      userId: conversations.user_id,
+      createdAt: new Date(conversations.created_at),
+      updatedAt: new Date(conversations.updated_at),
+      lastMessage: conversations.messages?.length > 0 
+        ? conversations.messages[conversations.messages.length - 1].content 
         : '',
-      timestamp: conversation.updatedAt,
-    } as ConversationWithLastMessage;
+      timestamp: new Date(conversations.updated_at),
+    };
   }
 
   async create(createConversationDto: CreateConversationDto): Promise<ConversationWithLastMessage> {
-    const conversation = this.conversationRepository.create({
-      ...createConversationDto,
-      userId: createConversationDto.userId || 'anonymous',
-    });
+    const { data: conversation, error } = await this.supabase
+      .from('conversations')
+      .insert({
+        title: createConversationDto.title,
+        user_id: createConversationDto.userId || 'anonymous',
+      })
+      .select()
+      .single();
 
-    const savedConversation = await this.conversationRepository.save(conversation);
-    
+    if (error || !conversation) {
+      throw new Error(`Failed to create conversation: ${error?.message}`);
+    }
+
     return {
-      ...savedConversation,
+      id: conversation.id,
+      title: conversation.title,
+      userId: conversation.user_id,
+      createdAt: new Date(conversation.created_at),
+      updatedAt: new Date(conversation.updated_at),
       lastMessage: '',
-      timestamp: savedConversation.updatedAt,
-    } as ConversationWithLastMessage;
+      timestamp: new Date(conversation.updated_at),
+    };
   }
 
-  async update(id: string, updates: Partial<Conversation>, userId?: string): Promise<ConversationWithLastMessage> {
-    const conversation = await this.findOne(id, userId);
-    
-    // Update the base conversation properties
-    const baseConversation = await this.conversationRepository.findOne({ where: { id } });
-    if (!baseConversation) {
-      throw new NotFoundException('Conversation not found');
+  async update(id: string, updates: any, userId?: string): Promise<ConversationWithLastMessage> {
+    // First verify access
+    await this.findOne(id, userId);
+
+    const { data: conversation, error } = await this.supabase
+      .from('conversations')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !conversation) {
+      throw new Error(`Failed to update conversation: ${error?.message}`);
     }
-    
-    Object.assign(baseConversation, updates);
-    const updatedConversation = await this.conversationRepository.save(baseConversation);
-    
+
     return {
-      ...updatedConversation,
-      lastMessage: conversation.lastMessage || '',
-      timestamp: updatedConversation.updatedAt,
-    } as ConversationWithLastMessage;
+      id: conversation.id,
+      title: conversation.title,
+      userId: conversation.user_id,
+      createdAt: new Date(conversation.created_at),
+      updatedAt: new Date(conversation.updated_at),
+      lastMessage: '',
+      timestamp: new Date(conversation.updated_at),
+    };
   }
 
   async remove(id: string, userId?: string): Promise<void> {
-    const conversation = await this.conversationRepository.findOne({ where: { id } });
-    if (!conversation) {
-      throw new NotFoundException('Conversation not found');
+    // First verify access
+    await this.findOne(id, userId);
+
+    const { error } = await this.supabase
+      .from('conversations')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete conversation: ${error.message}`);
     }
-    
-    if (userId && conversation.userId !== userId) {
-      throw new NotFoundException('Conversation not found');
-    }
-    
-    await this.conversationRepository.remove(conversation);
   }
 
   // Message operations
-  async getMessages(conversationId: string, userId?: string): Promise<Message[]> {
+  async getMessages(conversationId: string, userId?: string): Promise<any[]> {
     // First verify the conversation exists and user has access
     await this.findOne(conversationId, userId);
 
-    return this.messageRepository.find({
-      where: { conversationId },
-      order: { createdAt: 'ASC' },
-    });
+    const { data: messages, error } = await this.supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch messages: ${error.message}`);
+    }
+
+    return messages || [];
   }
 
-  async createMessage(createMessageDto: CreateMessageDto): Promise<Message> {
-    const message = this.messageRepository.create(createMessageDto);
-    const savedMessage = await this.messageRepository.save(message);
+  async createMessage(createMessageDto: CreateMessageDto): Promise<any> {
+    const { data: message, error } = await this.supabase
+      .from('messages')
+      .insert({
+        conversation_id: createMessageDto.conversationId,
+        role: createMessageDto.role,
+        content: createMessageDto.content,
+        reasoning: createMessageDto.reasoning,
+        function_calls: createMessageDto.functionCalls,
+        function_outputs: createMessageDto.functionOutputs,
+      })
+      .select()
+      .single();
 
-    // Update conversation's updatedAt timestamp
-    await this.conversationRepository.update(
-      createMessageDto.conversationId,
-      { updatedAt: new Date() }
-    );
+    if (error || !message) {
+      throw new Error(`Failed to create message: ${error?.message}`);
+    }
 
-    return savedMessage;
+    // Update conversation's updated_at timestamp
+    await this.supabase
+      .from('conversations')
+      .update({ updated_at: new Date() })
+      .eq('id', createMessageDto.conversationId);
+
+    return message;
   }
 
-  async updateMessage(id: string, updates: Partial<Message>): Promise<Message> {
-    const message = await this.messageRepository.findOne({ where: { id } });
-    
-    if (!message) {
+  async updateMessage(id: string, updates: any): Promise<any> {
+    const { data: message, error } = await this.supabase
+      .from('messages')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !message) {
       throw new NotFoundException('Message not found');
     }
 
-    Object.assign(message, updates);
-    return this.messageRepository.save(message);
+    return message;
   }
 } 

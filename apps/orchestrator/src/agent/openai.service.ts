@@ -43,52 +43,92 @@ export class OpenAIService {
     try {
       this.logger.log(`Creating OpenAI response with model: ${request.model}`);
       
-      // Handle streaming vs non-streaming separately
-      if (request.stream) {
-        const response = await this.openai.chat.completions.create({
+      // Use /responses endpoint for o3 reasoning models with MCP integration
+      if (request.model === 'o3' || request.model === 'o3-mini' || request.model === 'o4-mini') {
+        // Convert function tools to MCP format for o3
+        const mcpTools = request.tools?.map(tool => {
+          if (tool.type === 'function') {
+            return {
+              type: 'mcp',
+              server_label: tool.function?.name || 'example_tool',
+              server_url: process.env.EXAMPLE_TOOL_URL || 'http://localhost:5001',
+              require_approval: 'never'
+            };
+          }
+          return tool;
+        }) || [];
+
+        const response = await (this.openai as any).responses.create({
           model: request.model,
-          messages: [
+          input: [
             {
               role: 'user',
-              content: request.input.join('\n'),
-            },
+              content: [
+                {
+                  type: 'input_text',
+                  text: request.input.join('\n'),
+                }
+              ]
+            }
           ],
-          tools: request.tools,
-          stream: true,
-          // o3-specific parameters
-          ...(request.model === 'o3' && {
-            reasoning_effort: request.reasoning?.effort || 'low',
-            reasoning_summary: request.reasoning?.summary || 'auto',
-          }),
+          tools: mcpTools,
+          stream: request.stream || false,
+          reasoning: {
+            effort: request.reasoning?.effort || 'low',
+          },
+          max_output_tokens: 4096,
         });
 
-        return {
-          id: `response_${Date.now()}`,
-          stream: response,
-        };
+        if (request.stream) {
+          return {
+            id: response.id,
+            stream: response,
+          };
+        } else {
+          return {
+            id: response.id,
+            content: response.output_text || '',
+            reasoning: response.reasoning || null,
+          };
+        }
       } else {
-        const response = await this.openai.chat.completions.create({
-          model: request.model,
-          messages: [
-            {
-              role: 'user',
-              content: request.input.join('\n'),
-            },
-          ],
-          tools: request.tools,
-          stream: false,
-          // o3-specific parameters
-          ...(request.model === 'o3' && {
-            reasoning_effort: request.reasoning?.effort || 'low',
-            reasoning_summary: request.reasoning?.summary || 'auto',
-          }),
-        });
+        // Use traditional chat completions for other models
+        if (request.stream) {
+          const response = await this.openai.chat.completions.create({
+            model: request.model,
+            messages: [
+              {
+                role: 'user',
+                content: request.input.join('\n'),
+              },
+            ],
+            tools: request.tools,
+            stream: true,
+          });
 
-        return {
-          id: `response_${Date.now()}`,
-          content: response.choices[0]?.message?.content || '',
-          reasoning: (response.choices[0]?.message as any)?.reasoning || null,
-        };
+          return {
+            id: `response_${Date.now()}`,
+            stream: response,
+          };
+        } else {
+          const response = await this.openai.chat.completions.create({
+            model: request.model,
+            messages: [
+              {
+                role: 'user',
+                content: request.input.join('\n'),
+              },
+            ],
+            tools: request.tools,
+            stream: false,
+          });
+
+          return {
+            id: `response_${Date.now()}`,
+            content: response.choices[0]?.message?.content || '',
+            reasoning: null,
+          };
+        }
       }
     } catch (error) {
       this.logger.error('Failed to create OpenAI response:', error);
@@ -98,31 +138,28 @@ export class OpenAIService {
 
   async *streamResponse(responseId: string): AsyncGenerator<ResponseChunk> {
     try {
-      // This is a simplified implementation
-      // In a real scenario, you would retrieve the actual stream based on responseId
       this.logger.log(`Streaming response: ${responseId}`);
       
-      // Simulate streaming response for now
-      const messages = [
-        'I understand you\'re asking about ',
-        'this topic. Let me think about it carefully.\n\n',
-        'Based on my knowledge, I can provide you with ',
-        'a comprehensive answer that covers the key points ',
-        'you\'re interested in.\n\n',
-        'Here\'s what I think: ',
-        'This is a complex subject that requires careful consideration ',
-        'of multiple factors and perspectives.',
-      ];
-
-      for (const message of messages) {
+      // For now, return a simple completion message
+      // In a real implementation, you would either:
+      // 1. Store the stream from the original request and replay it
+      // 2. Use the OpenAI responses.retrieve() method if available
+      // 3. Stream from a different source based on the responseId
+      
+      const message = "I apologize, but I'm having trouble connecting to the AI service right now. This is a simulated response.";
+      
+      // Split the message into chunks for streaming effect
+      const words = message.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const chunk = words[i] + (i < words.length - 1 ? ' ' : '');
         yield {
           output_text: {
-            delta: message,
+            delta: chunk,
           },
         };
         
         // Add delay to simulate real streaming
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       yield { done: true };
@@ -172,24 +209,34 @@ export class OpenAIService {
   // Helper method to validate o3 model availability
   async validateO3Model(): Promise<boolean> {
     try {
-      const models = await this.openai.models.list();
-      const o3Available = models.data.some(model => model.id === 'o3');
+      // Try to make a simple request to the responses endpoint to validate o3 access
+      const testResponse = await (this.openai as any).responses.create({
+        model: 'o3',
+        input: 'Hello',
+        max_output_tokens: 10,
+        store: false, // Don't store this test request
+      });
       
-      if (!o3Available) {
-        this.logger.warn('o3 model not available, falling back to gpt-4');
-        return false;
-      }
-      
+      this.logger.log('o3 model validation successful');
       return true;
     } catch (error) {
-      this.logger.error('Failed to validate o3 model:', error);
+      this.logger.warn('o3 model not available, will use fallback:', error.message);
       return false;
     }
   }
 
   // Get the best available model
   async getBestAvailableModel(): Promise<string> {
-    const o3Available = await this.validateO3Model();
-    return o3Available ? 'o3' : 'gpt-4-turbo-preview';
+    // For now, assume o3 is available since it's configured in production
+    // In production, you might want to cache this validation result
+    const hasValidApiKey = !!process.env.OPENAI_API_KEY;
+    
+    if (hasValidApiKey) {
+      this.logger.log('Using standard o3 model for reasoning and MCP tasks');
+      return 'o3'; // Uses standard o3 model with MCP tools via responses endpoint
+    } else {
+      this.logger.warn('No OpenAI API key configured, falling back to gpt-4-turbo-preview');
+      return 'gpt-4-turbo-preview';
+    }
   }
 } 
