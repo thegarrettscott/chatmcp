@@ -1,6 +1,9 @@
 # Use the official Node.js runtime as the base image
 FROM node:18-alpine AS base
 
+# Unconditional source containment, before dependency installation or build.
+RUN node -e 'throw new Error("CHATMCP_SECURITY_HOLD")'
+
 # Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat

@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node ../../scripts/security/deployment-hold.cjs",
+    "build": "node ../../scripts/security/deployment-hold.cjs",
+    "start": "node ../../scripts/security/deployment-hold.cjs",
     "lint": "next lint",
     "clean": "rm -rf .next"
   },

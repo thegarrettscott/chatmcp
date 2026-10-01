@@ -8,15 +8,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
+    "build": "node scripts/security/deployment-hold.cjs",
+    "dev": "node scripts/security/deployment-hold.cjs",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "test": "turbo run test",
     "clean": "turbo run clean && rm -rf node_modules",
-    "docker:up": "docker compose up -d",
+    "docker:up": "node scripts/security/deployment-hold.cjs",
     "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "start": "node scripts/security/deployment-hold.cjs",
+    "deploy": "node scripts/security/deployment-hold.cjs",
+    "test:security": "node --test scripts/security/containment.test.mjs"
   },
   "devDependencies": {
     "@turbo/gen": "^1.12.4",
