@@ -14,6 +14,11 @@ jobs:
         working-directory: apps/web-platform
     
     steps:
+      - name: Stop unreviewed deployment
+        working-directory: .
+        run: |
+          echo 'CHATMCP_SECURITY_HOLD: activation requires a reviewed source change.' >&2
+          exit 1
       - name: Checkout
         uses: actions/checkout@v4
 

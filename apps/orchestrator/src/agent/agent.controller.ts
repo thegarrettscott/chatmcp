@@ -8,11 +8,11 @@ import { User } from '../auth/decorators/user.decorator';
 
 @ApiTags('Agent')
 @Controller('agent')
+@UseGuards(JwtAuthGuard)
 export class AgentController {
   constructor(private readonly agentService: AgentService) {}
 
   @Post()
-  // @UseGuards(JwtAuthGuard) // Temporarily disabled for testing
   // @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new agent conversation' })
   async createAgent(

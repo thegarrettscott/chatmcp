@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Health')
 @Controller('health')
@@ -15,6 +16,7 @@ export class HealthController {
   }
 
   @Post('test-o3')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Test o3 model with MCP tools' })
   async testO3(@Body() body: { message: string }) {
     // Simple test endpoint that doesn't require database

@@ -5,7 +5,8 @@ metadata:
   labels:
     app: web-platform
 spec:
-  replicas: 3
+  # SECURITY HOLD: this legacy deployment must not start an old image.
+  replicas: 0
   selector:
     matchLabels:
       app: web-platform

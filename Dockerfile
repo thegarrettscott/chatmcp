@@ -4,6 +4,9 @@
 ARG NODE_VERSION=20.9.0
 FROM node:${NODE_VERSION}-slim as base
 
+# Unconditional source containment, before dependency installation or build.
+RUN node -e 'throw new Error("CHATMCP_SECURITY_HOLD")'
+
 LABEL fly_launch_runtime="NodeJS"
 
 # NodeJS app lives here

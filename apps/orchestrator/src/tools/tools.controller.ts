@@ -1,10 +1,11 @@
 import { Controller, Get, Post, Delete, Param, Query, Req, Res, UseGuards, Logger } from '@nestjs/common';
 import { Response } from 'express';
-import { AuthGuard } from '../auth/auth.guard';
+import { JwtAuthGuard as AuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ToolsService } from './tools.service';
 import { SlackService } from './slack.service';
 
 @Controller('tools')
+@UseGuards(AuthGuard)
 export class ToolsController {
   private readonly logger = new Logger(ToolsController.name);
 
